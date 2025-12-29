@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('https://sueca-server-production.up.railway.app', {
+const socket = io('https://sueca-server-production.up.railway.app/', {
   transports: ['websocket'], // Força o uso de WebSockets diretamente
   upgrade: false
 });
