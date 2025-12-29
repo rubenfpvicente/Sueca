@@ -1,0 +1,371 @@
+/* --- RESET E GERAL --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Impede scroll */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* --- CONTENTOR PRINCIPAL (FULL SCREEN) --- */
+.game-container.full-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle, #1a472a 0%, #0d2616 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* --- MENU E LOBBY --- */
+.menu-container, .lobby-screen, .lobby-center {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.lobby-screen {
+  z-index: 500;
+  width: 100%;
+}
+
+.menu-card, .lobby-card {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 40px;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+}
+
+.menu-card h1, .lobby-card h1 {
+  margin-bottom: 20px;
+  color: #ffeb3b;
+  letter-spacing: 2px;
+}
+
+input {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 8px;
+  border: none;
+  background: rgba(35, 35, 35, 0.9);
+  font-size: 1rem;
+  
+}
+
+button {
+  cursor: pointer;
+  padding: 12px 25px;
+  border-radius: 8px;
+  border: none;
+  font-weight: bold;
+  transition: 0.3s;
+  text-transform: uppercase;
+}
+
+.start-btn {
+  background: #4caf50;
+  color: white;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.start-btn:hover { background: #45a049; transform: scale(1.05); }
+
+/* --- HUD (PLACAR E TRUNFO) --- */
+.hud-overlay {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 15px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  z-index: 100;
+}
+
+.score-badge {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 1px solid #ffeb3b;
+  font-weight: bold;
+}
+
+.timer-badge { color: #ffeb3b; font-weight: bold; }
+
+.trump-icon {
+  width: 60px; /* Aumentado de 35px */
+  height: auto;
+  border-radius: 6px;
+  border: 2px solid white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+/* --- MESA DE JOGO --- */
+.poker-table-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.green-felt {
+  position: relative;
+  width: 750px;
+  height: 420px;
+  background: #245a31;
+  border: 18px solid #3d2b1f; /* Borda de Madeira */
+  border-radius: 200px;
+  box-shadow: 
+    inset 0 0 80px rgba(0,0,0,0.6), 
+    0 25px 50px rgba(0,0,0,0.7);
+}
+
+/* --- POSICIONAMENTO DOS JOGADORES NA MESA --- */
+.player-info {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+}
+
+.p-name {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+
+/* Coordenadas UI */
+.ui-pos-0 { bottom: -75px; left: 50%; transform: translateX(-50%); } /* TU */
+.ui-pos-1 { right: -130px; top: 50%; transform: translateY(-50%) rotate(-90deg); } /* DIREITA */
+.ui-pos-2 { top: -100px; left: 50%; transform: translateX(-50%); } /* CIMA */
+.ui-pos-3 { left: -130px; top: 50%; transform: translateY(-50%) rotate(90deg); } /* ESQUERDA */
+
+/* Mãos dos Oponentes (Mini-cartas viradas) */
+.mini-hand {
+  display: flex;
+  justify-content: center;
+}
+
+.back-card {
+  width: 35px;
+  margin-left: -25px;
+  border-radius: 3px;
+  box-shadow: 1px 1px 5px rgba(0,0,0,0.4);
+}
+
+.back-card:first-child { margin-left: 0; }
+
+/* --- CARTAS JOGADAS NO CENTRO --- */
+.table-center-slots {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 300px; /* Aumentado para dar mais espaço */
+  height: 220px; /* Aumentado para dar mais espaço */
+  transform: translate(-50%, -50%);
+}
+
+.card-played {
+  position: absolute;
+  width: 90px; /* Ligeiramente maior para visibilidade */
+  border-radius: 5px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+  transition: all 0.5s ease-out;
+}
+
+/* Posições das cartas no centro da mesa */
+.pos-0 { bottom: -30px; left: 50%; transform: translateX(-50%); } 
+.pos-2 { top: -30px; left: 50%; transform: translateX(-50%); }
+.pos-1 { right: -20px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+.pos-3 { left: -20px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+
+/* --- MÃO DO JOGADOR (FUNDO) --- */
+.my-hand-container {
+  width: 100%;
+  height: 180px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 25px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+  z-index: 200;
+}
+
+.h-card {
+  width: 105px;
+  border-radius: 6px;
+  box-shadow: 2px 5px 15px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease-out;
+  cursor: pointer;
+  background: white;
+}
+
+/* Efeito de hover na mão */
+.h-card.active:hover {
+  transform: translateY(-40px) scale(1.15) !important;
+  z-index: 300 !important;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.8);
+}
+
+/* Cartas bloqueadas */
+.h-card:not(.active) {
+  filter: brightness(0.6);
+  cursor: not-allowed;
+}
+
+/* --- MODAIS E MENSAGENS --- */
+.error-toast {
+  position: fixed;
+  top: 80px;
+  background: #ff5252;
+  color: white;
+  padding: 12px 25px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  z-index: 1000;
+  animation: slideDown 0.4s ease-out;
+}
+
+.game-over-full {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7); /* Menos opaco */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+  backdrop-filter: blur(4px); /* Efeito de desfoque elegante */
+}
+
+.modal {
+  background: #222;
+  padding: 50px;
+  border-radius: 30px;
+  text-align: center;
+  border: 3px solid #ffeb3b;
+  box-shadow: 0 0 50px rgba(255, 235, 59, 0.2);
+}
+
+.modal h1 { font-size: 3rem; margin-bottom: 10px; color: #ffeb3b; }
+.modal p { font-size: 1.5rem; margin-bottom: 30px; }
+
+.modal button {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 1.1rem;
+}
+
+.btn-exit {
+  background: transparent;
+  border: 2px solid #ff5252;
+  color: #ff5252;
+}
+
+.btn-exit:hover { background: #ff5252; color: white; }
+
+.btn-quit-game {
+  background: rgba(255, 82, 82, 0.2);
+  border: 1px solid #ff5252;
+  color: #ff5252;
+  font-size: 0.7rem;
+  padding: 5px 10px;
+  margin-top: 5px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.btn-quit-game:hover { background: #ff5252; color: white; }
+
+.team-a-border { border-left: 3px solid #4fc3f7; } /* Azul para Equipa A */
+.team-b-border { border-left: 3px solid #ff8a65; } /* Laranja para Equipa B */
+
+.score-badge {
+  font-size: 1.1rem;
+  padding: 10px 25px;
+  background: rgba(0,0,0,0.8);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.spec-tag {
+  background: #ffeb3b;
+  color: black;
+  font-size: 0.6rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin: 0 10px;
+  font-weight: bold;
+}
+
+.p-tag.me {
+  border: 1px solid #ffeb3b;
+  box-shadow: 0 0 10px rgba(255, 235, 59, 0.2);
+}
+
+.trump-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.trump-container small {
+  font-size: 0.6rem;
+  margin-bottom: 2px;
+  opacity: 0.8;
+}
+
+.final-scores-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+
+.ready-active {
+  background-color: #1b5e20 !important;
+  opacity: 0.8;
+  cursor: wait;
+}
+
+/* --- ANIMAÇÕES --- */
+@keyframes slideDown {
+  from { transform: translateY(-50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* --- RESPONSIVIDADE BÁSICA --- */
+@media (max-width: 800px) {
+  .green-felt {
+    width: 90vw;
+    height: 50vh;
+    border-width: 10px;
+  }
+  .h-card { width: 70px; margin-left: -35px !important; }
+}
