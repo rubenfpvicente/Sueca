@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3001');
+const socket = io('https://sueca-server-production.up.railway.app/');
 
 const sortHand = (hand) => {
   const suitOrder = { 'C': 0, 'E': 1, 'O': 2, 'P': 3 };
