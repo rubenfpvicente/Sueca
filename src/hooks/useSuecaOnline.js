@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('https://sueca-server-production.up.railway.app/', {
-  transports: ['websocket'], // Força o uso de WebSockets diretamente
-  upgrade: false
-});
+const socket = io('http://localhost:3001');
 
 const sortHand = (hand) => {
+  if (!hand) return [];
   const suitOrder = { 'C': 0, 'E': 1, 'O': 2, 'P': 3 };
   return [...hand].sort((a, b) => {
     if (a.suit !== b.suit) return suitOrder[a.suit] - suitOrder[b.suit];
@@ -14,13 +12,19 @@ const sortHand = (hand) => {
   });
 };
 
-export const useSuecaOnline = () => {
-  const [roomInfo, setRoomInfo] = useState({ id: null, players: [] });
+export const useSuecaOnline = (userName) => {
+  const [availableTables, setAvailableTables] = useState([]);
+  const [roomInfo, setRoomInfo] = useState({ id: null, players: [null,null,null,null] });
   const [inGame, setInGame] = useState(false);
+  const [gamePhase, setGamePhase] = useState('lobby');
+  const [cortador, setCortador] = useState(0);
+  const [dealer, setDealer] = useState(0);
+  const [totalScores, setTotalScores] = useState([0, 0]);
   const [isSpectator, setIsSpectator] = useState(false);
   const [spectatorName, setSpectatorName] = useState("");
   const [specOffer, setSpecOffer] = useState(null);
   const [gameOver, setGameOver] = useState(false);
+  const [isFinalGame, setIsFinalGame] = useState(false);
   const [hand, setHand] = useState([]);
   const [table, setTable] = useState([]);
   const [trump, setTrump] = useState(null);
@@ -30,95 +34,81 @@ export const useSuecaOnline = () => {
   const [allPlayers, setAllPlayers] = useState([]);
   const [cardCounts, setCardCounts] = useState({});
   const [timeLeft, setTimeLeft] = useState(30);
+  const [readyTimer, setReadyTimer] = useState(30);
   const [readyList, setReadyList] = useState([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    socket.on('tablesList', (list) => setAvailableTables(list));
     socket.on('roomUpdate', (data) => {
-      setRoomInfo({ id: data.id, players: data.players });
-      setAllPlayers(data.players);
+      setRoomInfo(data); setAllPlayers(data.players);
+      const me = data.players.find(p => p?.id === socket.id);
+      setPlayerIndex(me ? parseInt(me.index) : null);
+      setIsSpectator(!me);
     });
-    socket.on('offerSpectate', (data) => { setSpecOffer(data); setSpectatorName(data.playerName); });
-    socket.on('spectatorInit', (data) => {
-      setRoomInfo({ id: data.id, players: data.players });
-      setAllPlayers(data.players);
-      setIsSpectator(true);
-      setSpectatorName(data.mySpectatorName);
-      if (data.gameState.started) {
-        setInGame(true);
-        setTrump(data.gameState.trump);
-        setTable(data.gameState.table || []);
-        setTurn(data.gameState.turn);
-        setScores(data.gameState.scores);
-        setCardCounts(data.gameState.cardCounts);
-      }
-      setSpecOffer(null);
+    socket.on('gameStarted', (gs) => {
+      setInGame(true); setGameOver(false); setGamePhase(gs.phase); 
+      setCortador(gs.cortador); setDealer(gs.dealer); setScores([0,0]); setTable([]); setHand([]); setReadyList([]); setReadyTimer(30);
     });
+    socket.on('phaseUpdate', (data) => { setGamePhase(data.phase); setDealer(data.dealer); setTimeLeft(30); });
     socket.on('initHand', (data) => {
-      setHand(sortHand(data.hand));
-      setTrump(data.trump);
-      setPlayerIndex(data.playerIndex);
-      setAllPlayers(data.allPlayers);
-      setInGame(true);
-      setGameOver(false);
+      setHand(sortHand(data.hand)); setTrump(data.trump); setPlayerIndex(parseInt(data.playerIndex));
+      setTurn(parseInt(data.turn)); setGamePhase('playing'); setInGame(true);
     });
     socket.on('gameStateUpdate', (gs) => {
-      setTable(gs.table || []);
-      setTurn(gs.turn);
-      setScores(gs.scores);
-      setCardCounts(gs.cardCounts);
-      setTimeLeft(30);
+      setTable(gs.table || []); setTurn(parseInt(gs.turn)); setScores(gs.scores || [0,0]);
+      setCardCounts(gs.cardCounts || {}); if (gs.phase) setGamePhase(gs.phase); setTimeLeft(30);
     });
-    socket.on('updateMyHand', (h) => setHand(sortHand(h)));
-    socket.on('gameOver', (d) => { 
-      setGameOver(true); 
-      setInGame(false); // Volta para o fundo do Lobby
-      setScores(d.scores); 
-      setTable([]); // Limpa a mesa central
-    });
+    socket.on('gameOver', (d) => { setGameOver(true); setInGame(false); setScores(d.scores); setTotalScores(d.totalScores); setIsFinalGame(d.isFinal); setReadyTimer(30); });
     socket.on('readyUpdate', (list) => setReadyList(list));
-    socket.on('triggerRestart', () => {
-      setInGame(false);
-      setGameOver(false);
-      setReadyList([]);
-      setTable([]);
+    socket.on('triggerRestart', () => { setInGame(false); setGameOver(false); setTable([]); setHand([]); setGamePhase('lobby'); setReadyList([]); setReadyTimer(30); });
+    socket.on('spectatorInit', (data) => {
+      setRoomInfo({ id: data.id, players: data.players }); setIsSpectator(true);
+      setTotalScores(data.totalScores || [0,0]); setSpectatorName(data.mySpectatorName);
+      if (data.gameState?.started) {
+        setInGame(true); setGamePhase(data.gameState.phase); setTrump(data.gameState.trump);
+        setTable(data.gameState.table || []); setTurn(parseInt(data.gameState.turn)); setScores(data.gameState.scores);
+        setCardCounts(data.gameState.cardCounts); setCortador(data.gameState.cortador); setDealer(data.gameState.dealer);
+      }
     });
-    socket.on('spectatorBecamePlayer', (data) => {
-      console.log("Transformação: Agora és jogador!");
-      setIsSpectator(false);
-      setPlayerIndex(data.playerIndex);
-      setAllPlayers(data.allPlayers);
-      
-      // RESET TOTAL DA UI PARA ESTE UTILIZADOR
-      setGameOver(false); // Fecha o modal de fim de jogo
-      setInGame(false);   // Garante que vê o Menu da Mesa (Lobby)
-      setTable([]);       // Limpa mesa central
-      setHand([]);        // Limpa mãos antigas
-    });
-    socket.on('leftRoom', () => { setRoomInfo({ id: null, players: [] }); setInGame(false); setGameOver(false); setIsSpectator(false); });
+    socket.on('spectatorBecamePlayer', (data) => { setIsSpectator(false); setPlayerIndex(parseInt(data.playerIndex)); setGameOver(false); setInGame(false); });
+    socket.on('leftRoom', () => { setRoomInfo({ id: null, players: [null,null,null,null] }); setInGame(false); setGameOver(false); setIsSpectator(false); setPlayerIndex(null); setHand([]); });
+    socket.on('updateMyHand', (h) => setHand(sortHand(h)));
     socket.on('errorMsg', (m) => { setError(m); setTimeout(() => setError(""), 3000); });
-
     return () => socket.off();
-  }, []);
+  }, [roomInfo.id]);
 
   useEffect(() => {
-    if (!inGame || gameOver) return;
+    if (!inGame || gameOver || gamePhase === 'lobby') return;
     const t = setInterval(() => setTimeLeft(p => p > 0 ? p - 1 : 0), 1000);
     return () => clearInterval(t);
-  }, [inGame, gameOver, turn]);
+  }, [inGame, gameOver, turn, gamePhase]);
 
-  const joinTable = (playerName, roomID) => socket.emit('joinRoom', { playerName, roomID });
-  const confirmSpectate = (roomID) => socket.emit('confirmSpectate', { roomID, playerName: spectatorName });
-  const sitAtTable = () => {
-    // Usa o spectatorName que foi salvo no offerSpectate/spectatorInit
-    if (roomInfo.id) {
-      socket.emit('claimSlot', { roomID: roomInfo.id, playerName: spectatorName });
-    }
-  };
+  useEffect(() => {
+    if (!gameOver || isFinalGame) return;
+    const t = setInterval(() => {
+      setReadyTimer(prev => {
+        if (prev <= 1) {
+          if (!isSpectator && !readyList.includes(socket.id)) socket.emit('playerReady', roomInfo.id);
+          clearInterval(t); return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [gameOver, isFinalGame, readyList, roomInfo.id, isSpectator]);
+
+  const joinTable = (t, s, p) => socket.emit('joinSeat', { tableId: t, seatIndex: s, playerName: p });
   const startMatch = () => socket.emit('startGame', roomInfo.id);
-  const playCard = (cardId) => { if (!isSpectator && turn === playerIndex && table.length < 4) socket.emit('playCard', { roomID: roomInfo.id, cardId }); };
+  const cutDeck = (pos) => socket.emit('cutDeck', { roomID: roomInfo.id, cutPosition: pos });
+  const pickTrump = (side) => socket.emit('pickTrump', { roomID: roomInfo.id, side });
+  const playCard = (cId) => { if (parseInt(turn) === parseInt(playerIndex) && table.length < 4) socket.emit('playCard', { roomID: roomInfo.id, cardId: cId }); };
   const toggleReady = () => socket.emit('playerReady', roomInfo.id);
   const leaveTable = () => socket.emit('leaveRoom', roomInfo.id);
+  const sitAtTable = () => {
+    const emptySlot = roomInfo.players.findIndex(p => !p || p.isBot);
+    if (emptySlot !== -1) joinTable(roomInfo.id, emptySlot, spectatorName || userName);
+  };
 
-  return { roomInfo, inGame, isSpectator, specOffer, gameOver, hand, table, trump, turn, scores, playerIndex, allPlayers, cardCounts, timeLeft, readyList, error, myId: socket.id, joinTable, confirmSpectate, sitAtTable, startMatch, playCard, toggleReady, leaveTable, setSpecOffer };
+  return { availableTables, roomInfo, inGame, gamePhase, cortador, dealer, totalScores, isSpectator, gameOver, isFinalGame, readyTimer, hand, table, trump, turn, scores, playerIndex, cardCounts, timeLeft, readyList, error, myId: socket.id, joinTable, startMatch, cutDeck, pickTrump, playCard, toggleReady, leaveTable, sitAtTable };
 };

@@ -1,201 +1,127 @@
-import React from 'react';
-import Menu from './components/Menu';
+import React, { useState } from 'react';
 import { useSuecaOnline } from './hooks/useSuecaOnline';
 import './App.css';
 
 function App() {
-  const { 
-    roomInfo, inGame, isSpectator, specOffer, gameOver, hand, table, trump, turn, scores, 
-    playerIndex, allPlayers, cardCounts, timeLeft, readyList, error, myId,
-    joinTable, confirmSpectate, sitAtTable, startMatch, playCard, toggleReady, leaveTable, setSpecOffer 
-  } = useSuecaOnline();
+  const [userName, setUserName] = useState(localStorage.getItem('sueca_name') || "");
+  const { availableTables, roomInfo, inGame, gamePhase, cortador, dealer, totalScores, isSpectator, gameOver, isFinalGame, readyTimer, hand, table, trump, turn, scores, playerIndex, cardCounts, timeLeft, readyList, error, myId, joinTable, startMatch, cutDeck, pickTrump, playCard, toggleReady, leaveTable, sitAtTable } = useSuecaOnline(userName);
 
-  // --- LÓGICA DE APOIO ---
-  const myTeam = isSpectator ? 0 : (playerIndex !== null ? playerIndex % 2 : 0);
-  const otherTeam = myTeam === 0 ? 1 : 0;
-  
-  const getUIPlace = (serverIdx) => {
-    if (isSpectator) return serverIdx; 
-    return (serverIdx - playerIndex + 4) % 4;
-  };
-
-  const getPlayerName = (serverIdx) => {
-    const p = allPlayers.find(player => player.index === serverIdx);
-    if (!p) return `Jogador ${serverIdx}`;
-    return p.id === myId ? `${p.name} (Tu)` : p.name;
-  };
-
-  // 1. MENU INICIAL (Se não houver sala selecionada)
-  if (!roomInfo.id && !specOffer) {
-    return <Menu onJoin={joinTable} />;
-  }
-
-  // 2. AVISO DE MESA CHEIA / JOGO EM CURSO (OFERTA PARA ASSISTIR)
-  if (specOffer) {
+  if (!roomInfo.id) {
     return (
-      <div className="game-over-full">
-        <div className="modal">
-          <h2>Mesa {specOffer.isStarted ? "em Jogo" : "Cheia"}</h2>
-          <p>Deseja assistir à partida na Mesa {specOffer.roomID}?</p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'center' }}>
-            <button className="start-btn" onClick={() => confirmSpectate(specOffer.roomID)}>
-              ASSISTIR
-            </button>
-            <button className="btn-exit" onClick={() => setSpecOffer(null)}>
-              VOLTAR
-            </button>
-          </div>
+      <div className="lobby-screen main-bg">
+        <h1 className="main-title">Sueca</h1>
+        <div className="menu-header"><input placeholder="Teu Nome" value={userName} onChange={(e) => {setUserName(e.target.value); localStorage.setItem('sueca_name', e.target.value)}} /></div>
+        <div className="tables-grid">
+          {availableTables.map(t => (
+            <div key={t.id} className="table-card" onClick={() => userName && joinTable(t.id, null, userName)}>
+              <h3>{t.id}</h3>
+              <div className="mini-table">
+                {[0, 2, 1, 3].map(i => (
+                  <div key={i} className={`chair c-${i} ${t.players[i] ? 'taken' : 'free'}`} onClick={(e) => { e.stopPropagation(); if(userName && !t.players[i]) joinTable(t.id, i, userName); }}>
+                    {t.players[i] ? t.players[i].name : 'livre'}
+                  </div>
+                ))}
+              </div>
+              {t.started && <span className="tag">EM JOGO (ASSISTIR)</span>}
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
+  const myTeam = isSpectator ? 0 : (parseInt(playerIndex) % 2);
+  const otherTeam = (myTeam + 1) % 2;
+  const getUIPlace = (sIdx) => (playerIndex === null || isSpectator) ? sIdx : (parseInt(sIdx) - parseInt(playerIndex) + 4) % 4;
+  const getPlayerName = (sIdx) => roomInfo.players[sIdx]?.name || `Bot ${sIdx + 1}`;
+
   return (
     <div className="game-container full-screen">
       {error && <div className="error-toast">{error}</div>}
+      <button className="btn-exit-top-left" onClick={leaveTable}>SAIR</button>
 
-      {/* --- CAMADA 1: JOGO ATIVO --- */}
-      {inGame && (
-        <>
-          <div className="hud-overlay">
-            <div className="score-badge">
-              <span style={{color: '#4fc3f7'}}>Equipa A:</span> {scores[0]} | 
-              <span style={{color: '#ff8a65', marginLeft: '10px'}}>Equipa B:</span> {scores[1]}
-            </div>
-            
-            <div className="timer-badge">
-              ⏳ {timeLeft}s 
-              {isSpectator && <span className="spec-tag">ESPETADOR</span>}
-              {/* BOTÃO SAIR DURANTE O JOGO */}
-              <button className="btn-quit-game" onClick={leaveTable} style={{marginLeft: '15px'}}>
-                SAIR
-              </button>
-            </div>
+      <div className="score-table-container">
+        <table>
+          <thead><tr><th>Equipa</th><th>Partida</th><th>Jogo</th></tr></thead>
+          <tbody>
+            <tr><td className="team-red-text">Vermelha</td><td>{scores[1]}</td><td>{totalScores[1]}</td></tr>
+            <tr><td className="team-blue-text">Azul</td><td>{scores[0]}</td><td>{totalScores[0]}</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-            {trump && (
-              <div className="trump-container">
-                <img src={trump.image} className="trump-icon" alt="T" />
-              </div>
+      <div className="poker-table-area">
+        <div className="green-felt">
+          <div className="table-center-slots">
+            {inGame && gamePhase === 'playing' && table.map((c, i) => (
+              <img key={i} src={c.image} className={`card-played pos-${getUIPlace(c.playerIndex)}`} alt="C" />
+            ))}
+            {!inGame && !gameOver && playerIndex !== null && roomInfo.players.filter(p => p && !p.isBot).length >= 1 && (
+              <button className="start-match-btn" onClick={startMatch}>INICIAR JOGO</button>
             )}
           </div>
-
-          <div className="poker-table-area">
-            <div className="green-felt">
-              {[0, 1, 2, 3].map(idx => {
-                const uiPos = getUIPlace(idx);
-                const p = allPlayers.find(pl => pl.index === idx);
-                return (
-                  <div key={idx} className={`player-info ui-pos-${uiPos}`}>
-                    <span className={`p-name ${idx % 2 === 0 ? 'team-a-border' : 'team-b-border'}`}>
-                      {getPlayerName(idx)} {turn === idx && "⭐"}
-                    </span>
-                    {(uiPos !== 0 || isSpectator) && (
-                      <div className="mini-hand">
-                        {[...Array(cardCounts[idx] || 0)].map((_, i) => (
-                          <img key={i} src="https://deckofcardsapi.com/static/img/back.png" className="back-card" alt="B" />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              <div className="table-center-slots">
-                {table.map((c, i) => (
-                  <img key={i} src={c.image} className={`card-played pos-${getUIPlace(c.playerIndex)}`} alt="C" />
-                ))}
-                {table.length === 0 && !gameOver && (
-                  <div className="turn-indicator" style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', opacity:0.5}}>
-                    {turn === playerIndex ? "TUA VEZ!" : `Vez de ${getPlayerName(turn)}`}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {!isSpectator && (
-            <div className="my-hand-container">
-              <div className="hand-flex">
-                {hand.map((c, i) => (
-                  <img 
-                    key={c.id || i} 
-                    src={c.image} 
-                    className={`h-card ${turn === playerIndex && table.length < 4 ? 'active' : ''}`} 
-                    style={{ 
-                      marginLeft: i === 0 ? 0 : '-50px', 
-                      zIndex: i, 
-                      filter: (turn !== playerIndex || table.length >= 4) ? 'brightness(0.5)' : 'none', 
-                      transform: `rotate(${(i - hand.length/2)*2}deg)` 
-                    }}
-                    onClick={() => playCard(c.id)} 
-                    alt="C"
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* --- CAMADA 2: LOBBY (MENU DA MESA) --- */}
-      {!inGame && (
-        <div className="lobby-screen" style={{ background: gameOver ? 'transparent' : 'inherit' }}>
-          <div className="lobby-card">
-            <h1>Mesa: {roomInfo.id}</h1>
-            <div className="players-list">
-              <h3>Jogadores ({roomInfo.players.length}/4)</h3>
-              {roomInfo.players.map(p => (
-                <div key={p.id} className={`p-tag ${p.id === myId ? 'me' : ''}`}>
-                  {p.name} {p.id === myId && " (Tu)"}
-                </div>
-              ))}
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-              {!isSpectator ? (
-                <button className="start-btn" onClick={startMatch}>INICIAR JOGO</button>
-              ) : (
-                (roomInfo.players.length < 4 || roomInfo.players.some(p => p.isBot)) && (
-                  <button className="start-btn" style={{backgroundColor: '#2196F3'}} onClick={sitAtTable}>
-                    SENTAR NA MESA
-                  </button>
-                )
-              )}
-              <button className="btn-exit" onClick={leaveTable}>SAIR</button>
-            </div>
-          </div>
         </div>
+
+        {[0, 1, 2, 3].map((idx) => {
+          const uiPos = getUIPlace(idx);
+          const isTurn = parseInt(turn) === idx;
+          const isVert = uiPos === 1 || uiPos === 3;
+          const p = roomInfo.players[idx];
+
+          return (
+            <div key={idx} className={`player-container-box ui-pos-${uiPos}`}>
+              {p ? (
+                <div className={`p-label-v2 ${idx % 2 === 0 ? 'blue-team' : 'red-team'}`}>
+                  {p.name} {p.id === myId && "(Tu)"}
+                  {isTurn && inGame && gamePhase === 'playing' && <span className="player-timer">⏳ {timeLeft}s</span>}
+                </div>
+              ) : (
+                !inGame && <button className="sit-btn" onClick={() => joinTable(roomInfo.id, idx, userName)}>OCUPAR CADEIRA</button>
+              )}
+              {idx === dealer && trump && inGame && <div className="trump-side-marker"><small>TRUNFO</small><img src={trump.image} className="trump-card-mini" alt="T" /></div>}
+              {inGame && gamePhase === 'playing' && (uiPos !== 0 || isSpectator) && (
+                <div className={`opponent-hand-v2 ${isVert ? 'vertical' : 'horizontal'}`}>
+                  {[...Array(cardCounts[idx] || 0)].map((_, i) => <img key={i} src="https://deckofcardsapi.com/static/img/back.png" className="back-card-small" style={{ marginLeft: !isVert && i > 0 ? '-32px' : 0, marginTop: (isVert && i > 0) ? '-45px' : 0, zIndex: i }} alt="B" />)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {(gamePhase === 'cutting' || gamePhase === 'trumpSelection') && inGame && (
+        <div className="game-over-full"><div className="modal">
+          <h2>{gamePhase === 'cutting' ? "CORTE" : "TRUNFO"} ({timeLeft}s)</h2>
+          <div className="deck-visual"><img src="https://deckofcardsapi.com/static/img/back.png" alt="B" /></div>
+          {((gamePhase === 'cutting' && parseInt(playerIndex) === cortador) || (gamePhase === 'trumpSelection' && parseInt(playerIndex) === dealer)) ? (
+            gamePhase === 'cutting' ? <><input type="range" min="1" max="39" id="cutIn" className="cut-slider" /><button className="start-btn" onClick={() => cutDeck(parseInt(document.getElementById('cutIn').value))}>CORTAR</button></>
+            : <div style={{display:'flex', gap:'10px'}}><button className="start-btn" onClick={()=>pickTrump('top')}>CIMA</button><button className="start-btn" onClick={()=>pickTrump('bottom')}>BAIXO</button></div>
+          ) : <p>Aguardando oponente...</p>}
+        </div></div>
       )}
 
-      {/* --- CAMADA 3: MODAL FIM DE JOGO --- */}
+      {!isSpectator && inGame && gamePhase === 'playing' && (
+        <div className="my-hand-container"><div className="hand-flex">
+          {hand.map((c, i) => (
+            <img key={c.id || i} src={c.image} className={`h-card ${parseInt(turn) === parseInt(playerIndex) && table.length < 4 ? 'active' : ''}`}
+                 style={{ marginLeft: i === 0 ? 0 : '-50px', zIndex: i, filter: (parseInt(turn) === parseInt(playerIndex) && table.length < 4) ? 'none' : 'brightness(0.5)', transform: `rotate(${(i - (hand.length-1)/2)*2}deg)` }}
+                 onClick={() => parseInt(turn) === parseInt(playerIndex) && playCard(c.id)} alt="C" />
+          ))}
+        </div></div>
+      )}
+
       {gameOver && (
         <div className="game-over-full">
           <div className="modal">
-            <h1>
-              {isSpectator 
-                ? "FIM DE JOGO 🏁" 
-                : (scores[myTeam] > scores[otherTeam] ? "VITÓRIA! 🎉" : scores[myTeam] === scores[otherTeam] ? "EMPATE! 🤝" : "DERROTA! 😢")
-              }
-            </h1>
-            <p>Resultado Final: Equipa A {scores[0]} - {scores[1]} Equipa B</p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-              {!isSpectator ? (
-                <button 
-                  className={`start-btn ${readyList.includes(myId) ? 'ready-active' : ''}`} 
-                  onClick={toggleReady}
-                >
-                  {readyList.includes(myId) ? "AGUARDANDO OUTROS..." : "JOGAR NOVAMENTE"}
-                </button>
-              ) : (
-                (roomInfo.players.length < 4 || roomInfo.players.some(p => p.isBot)) && (
-                  <button className="start-btn" style={{backgroundColor: '#2196F3'}} onClick={sitAtTable}>
-                    OCUPAR LUGAR NA MESA
-                  </button>
-                )
-              )}
-              <button onClick={leaveTable} className="btn-exit">SAIR</button>
-            </div>
+            <h1 style={{color: scores[myTeam] >= scores[otherTeam] ? '#4caf50' : '#ff5252'}}>FIM DA PARTIDA</h1>
+            <p>Resultado: {scores[myTeam]} - {scores[otherTeam]}</p>
+            <div style={{margin: '10px 0', color: 'gold'}}>Pedras: Azul {totalScores[0]} - {totalScores[1]} Vermelha</div>
+            {!isSpectator ? (
+              <button className={`start-btn ${readyList.includes(myId) ? 'ready-active' : ''}`} onClick={toggleReady}>
+                {readyList.includes(myId) ? `Aguardando (${readyList.length}/${roomInfo.players.filter(p=>p&&!p.isBot).length})` : (isFinalGame ? "NOVO JOGO" : `CONTINUAR (${readyTimer}s)`)}
+              </button>
+            ) : (roomInfo.players.some(p => !p || p.isBot)) && <button className="start-btn" style={{backgroundColor: '#2196F3'}} onClick={sitAtTable}>OCUPAR LUGAR</button>}
+            <button onClick={leaveTable} className="btn-exit">SAIR</button>
           </div>
         </div>
       )}
