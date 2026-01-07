@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3001');
+const socket = io('https://sueca-server-production.up.railway.app/', {
+  transports: ['websocket'], // Força o uso de WebSockets diretamente
+  upgrade: false
+});
+
+// const socket = io('http://localhost:3001'); 
 
 const sortHand = (hand) => {
   if (!hand) return [];
